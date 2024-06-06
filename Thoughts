@@ -1,0 +1,6 @@
+Read voltage
+Convert desired speeds to desired voltages
+These voltages will correspond to a 10 bit integer
+Use a PID controller to control the voltage with a 10 bit integer duty cycle
+dont use micros() or millis(), instead tune down the integral gain and hand tune
+Use encoder to measure speed on second arduino and compare
