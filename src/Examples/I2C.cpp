@@ -27,19 +27,22 @@ void Detain (uint16_t length);
 uint8_t Initialize();
 
 int main(){
-  sei();
-  // f_SCL = 16000000/(16+2*(TWBR*Prescaler)) TWBR = 1, Prescaler = 16
+  sei(); 
+  // f_SCL = 16000000/(16+2*(TWBR*Prescaler))
   TWBR = 1;
-  TWSR = (1<<TWPS1);
+  TWSR = (1<<TWPS1); // Sets prescaler to 16
+  // f_SCL = 400kHz with above settings, limit of ATMega328P with internal pullup resistors
   Serial.begin(115200);
-  uint8_t Status = Initialize();
+  uint8_t Status = Initialize(); // Group sensor setup in this function
   while(1){
-    if (Status==1){
-      uint8_t data[21];
-      uint8_t result = Read(BMTR_ADRS,BMTR_CON_START,data);
+    if (Status==1){ // If initialization was successful
+      uint8_t data[21]; 
+      // Again if data is a scaler, add an & before it in the function call below
+      uint8_t result = Read(BMTR_ADRS,BMTR_CON_START,data); 
       Detain(65000);
       if (result==1){
-        for (uint8_t i=0;i<21;i++){
+        // Remove for loop if data is a scaler
+        for (uint8_t i=0;i<sizeof(data);i++){
           Serial.print(data[i]);
           Serial.print(",");
         }
@@ -56,6 +59,7 @@ int main(){
 }
 
 uint8_t Initialize(){
+  // Throw initial register setting on sensor in this function, results will ==4 if all checks passed
   uint8_t Register_Data0 = (1<<5) | (1<<4) | (1<<1) | (1<<0);
   uint8_t result0 = Transmit(BMTR_ADRS,BMTR_PWR_CTRL,Register_Data0);
   uint8_t Register_Data1 = (1<<4) | (1<<2) | (1<<0);
@@ -120,16 +124,16 @@ uint8_t Read(uint8_t Slave_Address, uint8_t Register_Address, uint8_t data[]){
     if ((TWSR & 0xF8) != TW_MR_SLA_ACK){return 0;} // Mask prescaler bits in TWSR, check if slave acknowledge
 
     while(j<length){
-      TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA); // Data byte received and NACK transmitted back to slave
+      TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA); // Data byte received and ACK transmitted back to slave
       while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set
-      if ((TWSR & 0xF8) != TW_MR_DATA_ACK){return 0;} // Mask prescaler bits in TWSR, check if slave acknowledge   
+      if ((TWSR & 0xF8) != TW_MR_DATA_ACK){return 0;} // Mask prescaler bits in TWSR, send acknowledge to slave   
       data[j] = TWDR; // Read data sent from slave
       ++j;
     }
 
     TWCR = (1<<TWINT) | (1<<TWEN) | (0<<TWEA); // Data byte received and NACK transmitted back to slave
     while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set
-    if ((TWSR & 0xF8) != TW_MR_DATA_NACK){return 0;} // Mask prescaler bits in TWSR, check if slave acknowledge   
+    if ((TWSR & 0xF8) != TW_MR_DATA_NACK){return 0;} // Mask prescaler bits in TWSR, send not acknowledge to slave   
     data[j] = TWDR; // Read data sent from slave
     TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); // Send STOP
   }
