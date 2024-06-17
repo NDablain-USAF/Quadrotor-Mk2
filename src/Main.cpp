@@ -62,7 +62,7 @@ uint8_t Initialize_BMP390(uint32_t PAR_T[3]){
   // Establish factory constants
   uint8_t data[21];
   // Read factory calibration data
-  // Addresses, sizes, and sign data located on page 28 of BST-BMP390-DS002.pdf
+  // Addresses, sizes, and sign data located on page 28 of BST-BMP390-DS001.pdf
   uint8_t result = Read(BMTR_ADRS,BMTR_CON_START,data);
   if (result!=1){return 1;}
   uint16_t NVM_PAR_T1 = data[1]<<8;
