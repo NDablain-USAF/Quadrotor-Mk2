@@ -123,3 +123,47 @@ uint8_t Transmit (uint8_t Slave_Address, uint8_t Register_Address, uint8_t Regis
 }
 
 uint8_t Read(uint8_t Slave_Address, uint8_t Register_Address, uint8_t data[]){
+  volatile uint8_t i = 0;
+  uint8_t length = sizeof(data)-1;
+  while(i<1){  
+    TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN); // TWINT starts operation of TWI, TWSTA sends START condition, TWEN enables TWI
+    while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set indicating START condition set
+    if (((TWSR & 0xF8) != TW_REP_START)&&((TWSR & 0xF8) != TW_START)){return 0;} // Mask prescaler bits in TWSR, check if not equal to start condition to trigger error
+    TWDR = Slave_Address<<1; // Write slave address to data register as write
+    TWCR = (1<<TWINT) | (1<<TWEN); // Start transmission
+    while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set
+    if ((TWSR & 0xF8) != TW_MT_SLA_ACK){return 0;} // Mask prescaler bits in TWSR, check if slave acknowledge
+    TWDR = Register_Address; // Send data (address device looks at)
+    TWCR = (1<<TWINT) | (1<<TWEN); // Start transmission
+    while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set
+    if ((TWSR & 0xF8) != TW_MT_DATA_ACK){return 0;} // Mask prescaler bits in TWSR, check if data sent
+    TWCR = (1<<TWINT) | (1<<TWSTO) | (1<<TWEN); // Send Stop
+    i++;
+  }
+  if (i>0){
+
+    volatile uint8_t j = 0;
+    TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN); // TWINT starts operation of TWI, TWSTA sends START condition, TWEN enables TWI
+    while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set indicating START condition set
+    if (((TWSR & 0xF8) != TW_REP_START)&&((TWSR & 0xF8) != TW_START)){return 0;} // Mask prescaler bits in TWSR, check if not equal to start condition to trigger error
+    TWDR = (Slave_Address<<1) | (1<<0); // Write slave address to data register as read
+    TWCR = (1<<TWINT) | (1<<TWEN); // Start transmission
+    while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set
+    if ((TWSR & 0xF8) != TW_MR_SLA_ACK){return 0;} // Mask prescaler bits in TWSR, check if slave acknowledge
+
+    while(j<length){
+      TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWEA); // Data byte received and ACK transmitted back to slave
+      while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set
+      if ((TWSR & 0xF8) != TW_MR_DATA_ACK){return 0;} // Mask prescaler bits in TWSR, send acknowledge to slave   
+      data[j] = TWDR; // Read data sent from slave
+      ++j;
+    }
+
+    TWCR = (1<<TWINT) | (1<<TWEN) | (0<<TWEA); // Data byte received and NACK transmitted back to slave
+    while(!(TWCR & (1<<TWINT))){asm("");} // Wait for TWINT flag to be set
+    if ((TWSR & 0xF8) != TW_MR_DATA_NACK){return 0;} // Mask prescaler bits in TWSR, send not acknowledge to slave   
+    data[j] = TWDR; // Read data sent from slave
+    TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); // Send STOP
+  }
+  return 1;
+}
