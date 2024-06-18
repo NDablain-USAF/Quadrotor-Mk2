@@ -13,7 +13,7 @@
 #define BMTR_PWR_CTRL 0x1B // Power control register
 #define BMTR_OSR 0x1C // Output sample rate register
 #define BMTR_ODR 0x1D // Output data rate register
-#define BMTR_CON_START 0x32 // Start register of factory calibration data
+#define BMTR_CON_START 0x31 // Start register of factory calibration data
 
 // Transmit: Writes one byte of data into a slave device register
 // Returns 4 if successful, lower numbers indicate stage of error 
