@@ -2,41 +2,93 @@
 
 int main(){
   Serial.begin(115200);
-  uint32_t PAR_T[3];
+  float PAR_T[3];
+  float PAR_P[11];
   Initialize_ATMEGA328P();
-  uint8_t Status = Initialize_BMP390(PAR_T); // Group sensor setup in this function
+  uint8_t Status = Initialize_BMP390(PAR_T, PAR_P); // Group sensor setup in this function
   while(1){
-    if (Status==2){ // If initialization was successful
-      uint32_t Temperature = Read_BMP390(PAR_T);
+    if (bmtr_flag==1){
+      if (Status==2){ // If initialization was successful
+        volatile float Height = Read_BMP390(PAR_T, PAR_P);
+        Serial.println(Height);
+      }
     }
-    Detain(65000);
+
   }
 
   return 0;
 }
 
-uint32_t Read_BMP390(uint32_t PAR_T[3]){
-  uint8_t data[3];
+float Read_BMP390(float *PAR_T, float *PAR_P){
+  static volatile float Height_Bias;
+  static volatile uint8_t calWait;
+  const float c1 = BMTR_Tb/BMTR_Lb;
+  const float c2 = (-BMTR_R*BMTR_Lb)/(BMTR_g*BMTR_M);
+  uint8_t data[6];
   uint8_t length = sizeof(data);
-  uint8_t result = Read(BMTR_ADRS,BMTR_TEMP_DATA,data,length);
+  uint8_t result = Read(BMTR_ADRS,BMTR_PRES_DATA,data,length);
   if (result==8){
-    uint32_t Temperature = data[2];
+    // Read Data
+    uint32_t Pressure = data[2];
+    Pressure = Pressure<<16;
+    uint16_t MRFudge = data[1];
+    MRFudge = MRFudge<<8;
+    MRFudge += data[0];
+    Pressure += MRFudge;
+    uint32_t Temperature = data[5];
     Temperature = Temperature<<16;
-    uint16_t MRSFudge = data[1];
+    uint16_t MRSFudge = data[4];
     MRSFudge = MRSFudge<<8;
-    MRSFudge += data[0];
+    MRSFudge += data[3];
     Temperature += MRSFudge;
+
+    // Calibrate Data
+    float tpartial_data[2];
+    float ppartial_data[4];
+    float ppartial_out[2];
+
+    tpartial_data[0] = (float)(Temperature-*PAR_T);
+    ++PAR_T; // Move to PAR_T2
+    tpartial_data[1] = (float)(tpartial_data[0]**PAR_T);
+    ++PAR_T; // Move to PAR_T3
+    float Temperature_Comp = tpartial_data[1]+(tpartial_data[0]*tpartial_data[0]**PAR_T);
+    float temp1 = Temperature_Comp*Temperature_Comp;
+    float temp2 = temp1*Temperature_Comp;
+    PAR_P += 5; // Move to PAR_P6
+    ppartial_data[0] = *PAR_P*Temperature_Comp;
+    ++PAR_P; // Move to PAR_P7
+    ppartial_data[1] = *PAR_P*temp1;
+    ++PAR_P; // Move to PAR_P8
+    ppartial_data[2] = *PAR_P*temp2;
+    PAR_P -= 3; // Move to PAR_P5
+    ppartial_out[0] = *PAR_P+ppartial_data[0]+ppartial_data[1]+ppartial_data[2];
+    PAR_P -= 3; // Move to PAR_P2
+    ppartial_data[0] = *PAR_P*Temperature_Comp;
+    ++PAR_P; // Move to PAR_P3
+    ppartial_data[1] = *PAR_P*temp1;
+    ++PAR_P; // Move to PAR_P4
+    ppartial_data[2] = *PAR_P*temp2;
+    PAR_P -= 3; // Move to PAR_P1
+    ppartial_out[1] = (float)Pressure*(*PAR_P+ppartial_data[0]+ppartial_data[1]+ppartial_data[2]);
+    ppartial_data[0] = Pressure*Pressure;
+    PAR_P += 8; // Move to PAR_P9
+    ppartial_data[1] = *PAR_P;
+    ++PAR_P; // Move to PAR_P10
+    ppartial_data[1] += (*PAR_P*Temperature_Comp);
+    ppartial_data[2] = ppartial_data[0]*ppartial_data[1];
+    ++PAR_P; // Move to PAR_P11
+    ppartial_data[3] = ppartial_data[2] + (ppartial_data[0]*Pressure**PAR_P);
+    float Pressure_Comp = ppartial_out[0]+ppartial_out[1]+ppartial_data[3];
+    float Height_Compensated = c1*(pow((Pressure_Comp/BMTR_Pb),c2)-1); // Height in m
+    if (calWait<50){
+      ++calWait;
+      Height_Bias = Height_Compensated;
+    }
+    else if (calWait==50){
+      float Height_Out = Height_Compensated-Height_Bias;
+      return Height_Out;
+    }
     
-    int32_t t_partial0 = Temperature-PAR_T[0];
-    uint32_t t_partial1 = t_partial0*PAR_T[1];
-    t_partial0/=1000;
-    uint32_t t_partial2 = t_partial0*t_partial0;
-    t_partial2/=1000;
-    t_partial2*=PAR_T[2];
-    uint32_t TC = t_partial1+t_partial2;
-    TC/=10000000; //1e7
-    uint32_t Temperature_Compensated = TC;
-    return Temperature_Compensated;
   }
   
   return 0;
@@ -48,9 +100,11 @@ void Initialize_ATMEGA328P(){
   TWBR = 1;
   TWSR = (1<<TWPS1); // Sets prescaler to 16
   // f_SCL = 400kHz with above settings, limit of ATMega328P with internal pullup resistors
+  PCICR |= (1<<2); // Enable PC interrupts on port D
+  PCMSK2 |= (1<<3); // Enable D3 for PC interrupts
 }
 
-uint8_t Initialize_BMP390(uint32_t PAR_T[3]){
+uint8_t Initialize_BMP390(float *PAR_T, float *PAR_P){
   // Throw initial register setting on sensor in this function, results will ==4 if all checks passed
   uint8_t Register_Data0 = (1<<5) | (1<<4) | (1<<1) | (1<<0);
   uint8_t result0 = Transmit(BMTR_ADRS,BMTR_PWR_CTRL,Register_Data0);
@@ -58,7 +112,11 @@ uint8_t Initialize_BMP390(uint32_t PAR_T[3]){
   uint8_t result1 = Transmit(BMTR_ADRS,BMTR_OSR,Register_Data1);
   uint8_t Register_Data2 = (1<<2);
   uint8_t result2 = Transmit(BMTR_ADRS,BMTR_ODR,Register_Data2);
-  if ((result0!=4)||(result1!=4)||(result2!=4)){return 0;}
+  uint8_t Register_Data3 = (1<<3);
+  uint8_t result3 = Transmit(BMTR_ADRS,BMTR_IIR,Register_Data3);
+  uint8_t Register_Data4 = (1<<6);
+  uint8_t result4 = Transmit(BMTR_ADRS,BMTR_INT,Register_Data4);
+  if ((result0!=4)||(result1!=4)||(result2!=4)||(result3!=4)||(result4!=4)){return 0;}
   // Establish factory constants
   uint8_t data[21];
   uint8_t length = sizeof(data);
@@ -71,12 +129,52 @@ uint8_t Initialize_BMP390(uint32_t PAR_T[3]){
   uint16_t NVM_PAR_T2 = data[3]<<8;
   NVM_PAR_T2 += data[2];
   int8_t NVM_PAR_T3 = data[4];
-  // Figure out wtf to do with these floats
-  PAR_T[0] = NVM_PAR_T1*10000; // Scale to divide by whole number
-  PAR_T[0]/=39; 
-  PAR_T[1] = NVM_PAR_T2/107; // Check value of NVM_PAR_T2, this is scaled by 1e7
-  PAR_T[2] = NVM_PAR_T3*100000; // Scaled by 1e16
-  PAR_T[2]/=2815;
+  int16_t NVM_PAR_P1 = data[6]<<8;
+  NVM_PAR_P1 += data[5];
+  int16_t NVM_PAR_P2 = data[8]<<8;
+  NVM_PAR_P2 += data[7];
+  int8_t NVM_PAR_P3 = data[9];
+  int8_t NVM_PAR_P4 = data[10];
+  uint16_t NVM_PAR_P5 = data[12]<<8;
+  NVM_PAR_P5 += data[11];
+  uint16_t NVM_PAR_P6 = data[14]<<8;
+  NVM_PAR_P6 += data[13];
+  int8_t NVM_PAR_P7 = data[15];
+  int8_t NVM_PAR_P8 = data[16];
+  int16_t NVM_PAR_P9 = data[18]<<8;
+  NVM_PAR_P9 += data[17];
+  int8_t NVM_PAR_P10 = data[19];
+  int8_t NVM_PAR_P11 = data[20];
+
+  *PAR_T = NVM_PAR_T1/BMTR_cT1; // PAR_T1
+  ++PAR_T;
+  *PAR_T = NVM_PAR_T2/BMTR_cT2; // PAR_T2
+  ++PAR_T;
+  *PAR_T = NVM_PAR_T3/BMTR_cT3; // PAR_T3
+
+  *PAR_P = (NVM_PAR_P1-BMTR_cP0);
+  *PAR_P /= BMTR_cP1; // PAR_P1
+  ++PAR_P;
+  *PAR_P = (NVM_PAR_P2-BMTR_cP0);
+  *PAR_P /= BMTR_cP2; // PAR_P2
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P3/BMTR_cP3; // PAR_P3
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P4/BMTR_cP4; // PAR_P4
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P5/BMTR_cP5; // PAR_P5
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P6/BMTR_cP6; // PAR_P6
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P7/BMTR_cP7; // PAR_P7
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P8/BMTR_cP8; // PAR_P8
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P9/BMTR_cP9; // PAR_P9
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P10/BMTR_cP10; // PAR_P10
+  ++PAR_P;
+  *PAR_P = NVM_PAR_P11/BMTR_cP11; // PAR_P11
   return 2;
 }
 
@@ -148,4 +246,8 @@ uint8_t Read(uint8_t Slave_Address, uint8_t Register_Address, uint8_t *data, uin
   TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); // Send STOP
 
   return 8; // Success
+}
+
+ISR (PCINT2_vect){
+  bmtr_flag ^= 1;
 }
