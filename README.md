@@ -23,11 +23,11 @@ Table of Contents:<br />
 | Code | C++ | C |
 | MCU | Arduino Uno R3 Board | ATMega328P |
 | IDE | Arduino | Platform IO |
-| Code Data Types | Floats & Integers | Integers |
 | Attitude Measurement Hardware - Accelerometer | MPU 9250 Breakout Board | BMI 088 |
 | Attitude Measurement Hardware - Gyroscope | MPU 9250 Breakout Board | BMI 088 |
-| Attitude Measurement Hardware - Magnetometer | MPU 9250 Breakout Board | BMM 350 |
-| Attitude Measurement Software | Float operations using Math.h trig. functions | Integers with polynomial trig function approximations | 
+| Attitude Measurement Hardware - Magnetometer | MPU 9250 Breakout Board | None |
+| Attitude Measurement Software | Float operations using Math.h trig. functions | Integers with polynomial trig function approximations |
+| Attitude Representation | Euler Angles | Quaternions |
 <br /> 
 <br /> 
 <br /> 
