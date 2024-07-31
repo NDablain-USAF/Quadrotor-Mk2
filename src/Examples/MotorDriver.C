@@ -5,18 +5,18 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-#define controlTime 6
-#define e_int_limit 10000
+#define CONTROL_TIME 6
+#define E_INT_LIMIT 10000
 
-const uint16_t c1 = 985; // IIR filter coefficients for back-emf measurement
-const uint16_t c2 = 15;
-const uint32_t K_P = 8; // Proportional control gain
-const uint32_t K_I = 3; // Integral control gain
-const uint16_t r = 37; // Reference voltage measurement, lower measurement means higher back-emf and higher motor speed
+const uint16_t g_c1 = 985; // IIR filter coefficients for back-emf measurement
+const uint16_t g_c2 = 15;
+const uint32_t g_kp = 8; // Proportional control gain
+const uint32_t g_ki = 3; // Integral control gain
+const uint16_t g_r = 37; // Reference voltage measurement, lower measurement means higher back-emf and higher motor speed
 
 // Flags are set in ISRs, affect changes in while loop
-volatile uint8_t controlFlag;
-volatile uint8_t ADCFlag;
+volatile uint8_t g_control_flag;
+volatile uint8_t g_adc_flag;
 
 struct Motor {
   int16_t e_int;
@@ -44,31 +44,31 @@ int main(){
   struct Motor Motor1 = {0};
   while(1){
 
-    if (controlFlag==1){
+    if (g_control_flag==1){
         ADCSRA |= (1<<ADSC); // Begin conversion
-        volatile int16_t e = x-r;
+        volatile int16_t e = Motor1.omega-g_r;
         // Integrate at rate set by timer 0, e_int_limit prevent integrator windup
-        if ((Motor1.e_int>-e_int_limit)&&(Motor1.e_int<e_int_limit)){Motor1.e_int+=e;}
-        volatile int32_t u = K_P*e + K_I*Motor1.e_int;
+        if ((Motor1.e_int>-E_INT_LIMIT)&&(Motor1.e_int<E_INT_LIMIT)){Motor1.e_int+=e;}
+        volatile int32_t u = g_kp*e + g_ki*Motor1.e_int;
         u /= 100;
         if (u<0){u=0;} else if (u>255){u=255;}
         OCR1A = u;
-        controlFlag = 0;
+        g_control_flag = 0;
     }  
-    if (ADCFlag==1){
-        Motor1.omega = (Motor1.omega*c1 + ADC*c2);
+    if (g_adc_flag==1){
+        Motor1.omega = (Motor1.omega*g_c1 + ADC*g_c2);
         Motor1.omega /= 1000;
-        ADCFlag = 0;
+        g_adc_flag = 0;
     }
   }
   return 0;
 }
 
  ISR (TIMER0_COMPA_vect){
-    controlFlag = 1;
-    OCR0A = controlTime;
+    g_control_flag = 1;
+    OCR0A = CONTROL_TIME;
 }
 
 ISR (ADC_vect){
-    ADCFlag = 1;
+    g_adc_flag = 1;
 } 
