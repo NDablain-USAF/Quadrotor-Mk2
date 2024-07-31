@@ -18,6 +18,11 @@ const uint16_t r = 37; // Reference voltage measurement, lower measurement means
 volatile uint8_t controlFlag;
 volatile uint8_t ADCFlag;
 
+struct Motor {
+  int16_t e_int;
+  uint32_t omega;
+};
+
 int main(){
   // Timer1/PWM Setup
   sei(); // Enable Interrupts
@@ -35,26 +40,24 @@ int main(){
   ADCSRA |= (1<<ADEN) | (1<<ADIE) | (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0); // Enable ADC, enable interrupt, set /128 prescaler
   // Pin Setup
   DDRB |= (1<<1); // Set D9 as output
+  // Motor Setup
+  struct Motor Motor1 = {0};
   while(1){
-    static volatile int16_t e_int;
-    static uint32_t x; 
 
     if (controlFlag==1){
         ADCSRA |= (1<<ADSC); // Begin conversion
         volatile int16_t e = x-r;
         // Integrate at rate set by timer 0, e_int_limits prevent integrator windup
-        e_int+=e;
-        if (e_int>e_int_limit){e_int=e_int_limit;}
-        else if (e_int<-e_int_limit){e_int=-e_int_limit;}
-        volatile int32_t u = K_P*e + K_I*e_int;
+        if ((Motor1.e_int>-e_int_limit)&&(Motor1.e_int<e_int_limit)){Motor1.e_int+=e;}
+        volatile int32_t u = K_P*e + K_I*Motor1.e_int;
         u /= 100;
         if (u<0){u=0;} else if (u>255){u=255;}
         OCR1A = u;
         controlFlag = 0;
     }  
     if (ADCFlag==1){
-        x = (x*c1 + ADC*c2);
-        x /= 1000;
+        Motor1.omega = (Motor1.omega*c1 + ADC*c2);
+        Motor1.omega /= 1000;
         ADCFlag = 0;
     }
   }
