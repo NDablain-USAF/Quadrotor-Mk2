@@ -47,7 +47,7 @@ int main(){
     if (controlFlag==1){
         ADCSRA |= (1<<ADSC); // Begin conversion
         volatile int16_t e = x-r;
-        // Integrate at rate set by timer 0, e_int_limits prevent integrator windup
+        // Integrate at rate set by timer 0, e_int_limit prevent integrator windup
         if ((Motor1.e_int>-e_int_limit)&&(Motor1.e_int<e_int_limit)){Motor1.e_int+=e;}
         volatile int32_t u = K_P*e + K_I*Motor1.e_int;
         u /= 100;
