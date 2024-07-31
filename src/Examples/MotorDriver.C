@@ -36,7 +36,7 @@ int main(){
   TIMSK0 |= (1<<OCIE0A); // Enable Timer 0 compare match A interrupt
   OCR0A = controlTime;
   // ADC Setup
-  ADMUX |= (1<<REFS0); // Use Vcc as reference voltage for ADC
+  ADMUX |= (1<<REFS0); // Use Vcc as reference voltage for ADC, ADC0 muxed by default
   ADCSRA |= (1<<ADEN) | (1<<ADIE) | (1<<ADPS2) | (1<<ADPS1) | (1<<ADPS0); // Enable ADC, enable interrupt, set /128 prescaler
   // Pin Setup
   DDRB |= (1<<1); // Set D9 as output
