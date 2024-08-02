@@ -1,7 +1,7 @@
 #include <avr/io.h>
-#include <cstdio.h>
+#include <stdio.h>
 
-#define F_CPU 16000000UL
+#define F_CPU 20000000UL
 
 void Transmit(long outbound);
 
@@ -10,18 +10,20 @@ int main(void){
 	PORTB |= (1<<PINB2); // Set SS high
 	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<SPR0); // Enables SPI, sets AVR as master, sets clock to f_osc/16
 	while (1) {
-		int16_t x = 1000;
+		int x = -1234;
 		Transmit((long)x);
 	}
 }
 
 void Transmit(long outbound){
-	char buffer[20];
-	uint8_t n = sprintf(buffer,%d,outbound);
+	char buffer[10];
+	int n = sprintf(buffer,"%ld",outbound);
 	PORTB &= ~(1<<PINB2); // Set B2 LOW
-	for (uint8_t i=0;i<n;i++){	
-		SPDR = (buffer[i]+48); // Put data into data register
+	for (int i=0;i<n;i++){
+		SPDR = buffer[i]; // Put data into data register
 		while (!(SPSR & (1<<SPIF))){asm("");} // Wait for flag to be set in status register to continue
 	}
+	SPDR = 10; // Line feed
+	while (!(SPSR & (1<<SPIF))){asm("");}
 	PORTB |= (1<<PINB2); // Set B2 HIGH
 }
