@@ -1,18 +1,17 @@
-#include <avr/io.h>
-#include <stdio.h>
-
-#define F_CPU 20000000UL
-
-void Transmit(long outbound);
+#include "spi.h"
 
 int main(void){
-	DDRB |= (1<<PINB5) | (1<<PINB3) | (1<<PINB2); // Set SCK, MOSI, and SS as outputs
-	PORTB |= (1<<PINB2); // Set SS high
-	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<SPR0); // Enables SPI, sets AVR as master, sets clock to f_osc/16
+	SPI_Init();
 	while (1) {
 		int x = -1234;
 		Transmit((long)x);
 	}
+}
+
+void SPI_Init(){
+	DDRB |= (1<<PINB5) | (1<<PINB3) | (1<<PINB2); // Set SCK, MOSI, and SS as outputs
+	PORTB |= (1<<PINB2); // Set SS high
+	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<SPR0); // Enables SPI, sets AVR as master, sets clock to f_osc/16
 }
 
 void Transmit(long outbound){
