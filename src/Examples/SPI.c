@@ -6,13 +6,11 @@ void Transmit(unsigned char outbound);
 
 int main(void){
 	DDRB |= (1<<PINB5) | (1<<PINB3) | (1<<PINB2); // Set SCK, MOSI, and SS as outputs
-	PORTB |= (1<<PINB2);
+	PORTB |= (1<<PINB2); // Set SS high
 	SPCR |= (1<<SPE) | (1<<MSTR) | (1<<SPR1) | (1<<SPR0); // Enables SPI, sets AVR as master, sets clock to f_osc/128
 	while (1) {
 		unsigned char x = 1;
 		Transmit(x);
-		//volatile int i = 0;
-		//while(i<60000){i++;}
 	}
 }
 
