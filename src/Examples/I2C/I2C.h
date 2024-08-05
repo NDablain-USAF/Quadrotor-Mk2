@@ -35,7 +35,7 @@ unsigned char Transmit (unsigned char Slave_Address, unsigned char Register_Addr
   if ((TWSR & 0xF8) != TW_MT_DATA_ACK){return 3;} // Mask prescaler bits in TWSR, check if data sent
   TWCR = (1<<TWINT) | (1<<TWSTO) | (1<<TWEN); // Send Stop
   return 4; // Success
-};
+}
 // Read: Reads up to 256 bytes of data from the specified slave address
 // IMPORTANT, is looking for an array of data, pass address if only reading a single value
 // Returns 8 if successful, lower numbers indicate stage of error
@@ -83,11 +83,11 @@ unsigned char Read(unsigned char Slave_Address, unsigned char Register_Address, 
   TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); // Send STOP
 
   return 8; // Success
-};
+}
 // Detain: Reproduction of the arduino.h delay() function, prevents overwhelming the serial monitor
 void Detain (unsigned int length){
   for (unsigned int i=0;i<length;i++){asm("");}
-};
+}
 // Initialize: Groups Transmit calls when sensor is being set up 
 unsigned char Initialize_BMP(){
   // Throw initial register setting on sensor in this function, results will ==4 if all checks passed
@@ -99,7 +99,7 @@ unsigned char Initialize_BMP(){
   unsigned char result2 = Transmit(BMTR_ADRS,BMTR_ODR,Register_Data2);
   if ((result0==4)&&(result1==4)&&(result2==4)){return 1;}
   else {return 0;}
-};
+}
 void Initialize(){
   sei(); 
   // f_SCL = 16000000/(16+2*(TWBR*Prescaler))
