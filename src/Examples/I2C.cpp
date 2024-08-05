@@ -7,7 +7,10 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/twi.h>
-#include <HardwareSerial.h>
+
+#ifndef F_CPU
+#define F_CPU 20000000UL
+#endif
 
 #define BMTR_ADRS 0x77 // BMP 390 Address
 #define BMTR_PWR_CTRL 0x1B // Power control register
