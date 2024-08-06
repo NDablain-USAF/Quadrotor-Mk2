@@ -1,4 +1,4 @@
-#include "Main.h"
+#include "main.h"
 
 int main(){
   float PAR_T[3];
