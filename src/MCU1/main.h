@@ -43,6 +43,10 @@ struct BMI088 {
     float W_Z_bias;
 };
 
+void Detain(unsigned long length){
+	// A reproduction of the delay() function, prevents overwhelming the serial monitor
+	for (unsigned long i=0;i<length;i++){asm("");}
+}
 unsigned char I2C_Transmit(unsigned char Slave_Address, unsigned char Register_Address, unsigned char Register_Data){
 // Transmit: Writes one byte of data into a slave device register
 // returns 4 if successful, lower numbers indicate stage of error 
@@ -112,6 +116,32 @@ unsigned char I2C_Read(unsigned char Slave_Address, unsigned char Register_Addre
 
   return 8; // Success
 }
+void Read_Acc(struct BMI088 Sensor){
+	unsigned char data[6];
+	unsigned char length = sizeof(data);
+	unsigned char result = I2C_Read(ACC_ADRS,ACC_DATA,data,length);
+	if (result==8){
+		int Accel_X_B = (data[1]*256) + data[0];
+		int Accel_Y_B = (data[3]*256) + data[2];
+		int Accel_Z_B = (data[5]*256) + data[4];
+		Sensor.Accel_X = (Sensor.Accel_X*ACC_IIR1) + (((float)Accel_X_B/32678)*6*ACC_IIR2);
+		Sensor.Accel_Y = (Sensor.Accel_Y*ACC_IIR1) + (((float)Accel_Y_B/32678)*6*ACC_IIR2);
+		Sensor.Accel_Z = (Sensor.Accel_Z*ACC_IIR1) + (((float)Accel_Z_B/32678)*6*ACC_IIR2);
+	}
+}
+void Read_Gyr(struct BMI088 Sensor){
+	unsigned char data[6];
+	unsigned char length = sizeof(data);
+	unsigned char result = I2C_Read(GYR_ADRS,GYR_DATA,data,length);
+	if (result==8){
+		int Gyr_X_B = (data[1]*256) + data[0];
+		int Gyr_Y_B = (data[3]*256) + data[2];
+		int Gyr_Z_B = (data[5]*256) + data[4];
+		Sensor.W_X = (Sensor.W_X*GYR_IIR1) + (((float)Gyr_X_B/32678)*500*GYR_IIR2);
+		Sensor.W_Y = (Sensor.W_Y*GYR_IIR1) + (((float)Gyr_Y_B/32678)*500*GYR_IIR2);
+		Sensor.W_Z = (Sensor.W_Z*GYR_IIR1) + (((float)Gyr_Z_B/32678)*500*GYR_IIR2);
+	}
+}
 char Initialize_BMI088(struct BMI088 Sensor){
 // returns 9 if successful, lower numbers indicate stage of error     
     // Accelerometer initialization
@@ -119,7 +149,7 @@ char Initialize_BMI088(struct BMI088 Sensor){
     if (status!=4){return 0;}
     Detain(5000); // Give time for accelerometer to power on
     unsigned char outbound = ((0x09)<<4) | (0x08);
-    status = I2C_Transmit(ACC_ADRS,ACC_CONF,outbound) // Set OSR2 and 100Hz ODR
+    status = I2C_Transmit(ACC_ADRS,ACC_CONF,outbound); // Set OSR2 and 100Hz ODR
     if (status!=4){return 1;}
     status = I2C_Transmit(ACC_ADRS,ACC_RANGE,0x01); // Set range to +-6g
     if (status!=4){return 2;}
@@ -147,10 +177,6 @@ char Initialize_BMI088(struct BMI088 Sensor){
 
     return 9;
 }
-void Detain(unsigned long length){
-// A reproduction of the delay() function, prevents overwhelming the serial monitor
-  for (unsigned long i=0;i<length;i++){asm("");}
-}
 void Initialize_ATMEGA328P(){
 // Use to group MCU one time register setups prior to running while loop
   sei(); 
@@ -160,32 +186,7 @@ void Initialize_ATMEGA328P(){
   PCICR |= (1<<2); // Enable PC interrupts on port D
   PCMSK2 |= (1<<3); // Enable D3 for PC interrupts
 }
-void Read_Acc(struct BMI088 Sensor){
-    unsigned char data[6];
-    unsigned char length = sizeof(data);
-    unsigned char result = I2C_Read(ACC_ADRS,ACC_DATA,data,length);
-    if (result==8){
-        int Accel_X_B = (data[1]*256) + data[0];
-        int Accel_Y_B = (data[3]*256) + data[2];
-        int Accel_Z_B = (data[5]*256) + data[4];
-        Sensor.Accel_X = (Sensor.Accel_X*ACC_IIR1) + (((float)Accel_X_B/32678)*6*ACC_IIR2);
-        Sensor.Accel_Y = (Sensor.Accel_Y*ACC_IIR1) + (((float)Accel_Y_B/32678)*6*ACC_IIR2);
-        Sensor.Accel_Z = (Sensor.Accel_Z*ACC_IIR1) + (((float)Accel_Z_B/32678)*6*ACC_IIR2);
-    }
-}
-void Read_Gyr(struct BMI088 Sensor){
-    unsigned char data[6];
-    unsigned char length = sizeof(data);
-    unsigned char result = I2C_Read(GYR_ADRS,GYR_DATA,data,length);
-    if (result==8){
-        int Gyr_X_B = (data[1]*256) + data[0];
-        int Gyr_Y_B = (data[3]*256) + data[2];
-        int Gyr_Z_B = (data[5]*256) + data[4];
-        Sensor.W_X = (Sensor.W_X*GYR_IIR1) + (((float)Gyr_X_B/32678)*500*GYR_IIR2);
-        Sensor.W_Y = (Sensor.W_Y*GYR_IIR1) + (((float)Gyr_Y_B/32678)*500*GYR_IIR2);
-        Sensor.W_Z = (Sensor.W_Z*GYR_IIR1) + (((float)Gyr_Z_B/32678)*500*GYR_IIR2);
-    }
-}
+/*
 ISR(){
     g_Acc_Flag ^= 1;
 }
@@ -193,5 +194,6 @@ ISR(){
 ISR(){
     g_Gyr_Flag ^= 1;
 }
-
+*/
 #endif
+
