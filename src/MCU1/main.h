@@ -116,7 +116,7 @@ unsigned char I2C_Read(unsigned char Slave_Address, unsigned char Register_Addre
 
   return 8; // Success
 }
-void Read_Acc(struct BMI088 Sensor){
+void Read_Acc(struct BMI088* Sensor){
 	unsigned char data[6];
 	unsigned char length = sizeof(data);
 	unsigned char result = I2C_Read(ACC_ADRS,ACC_DATA,data,length);
@@ -124,12 +124,12 @@ void Read_Acc(struct BMI088 Sensor){
 		int Accel_X_B = (data[1]*256) + data[0];
 		int Accel_Y_B = (data[3]*256) + data[2];
 		int Accel_Z_B = (data[5]*256) + data[4];
-		Sensor.Accel_X = (Sensor.Accel_X*ACC_IIR1) + (((float)Accel_X_B/32678)*6*ACC_IIR2);
-		Sensor.Accel_Y = (Sensor.Accel_Y*ACC_IIR1) + (((float)Accel_Y_B/32678)*6*ACC_IIR2);
-		Sensor.Accel_Z = (Sensor.Accel_Z*ACC_IIR1) + (((float)Accel_Z_B/32678)*6*ACC_IIR2);
+		Sensor->Accel_X = (Sensor->Accel_X*ACC_IIR1) + (((float)Accel_X_B/32678)*6*ACC_IIR2);
+		Sensor->Accel_Y = (Sensor->Accel_Y*ACC_IIR1) + (((float)Accel_Y_B/32678)*6*ACC_IIR2);
+		Sensor->Accel_Z = (Sensor->Accel_Z*ACC_IIR1) + (((float)Accel_Z_B/32678)*6*ACC_IIR2);
 	}
 }
-void Read_Gyr(struct BMI088 Sensor){
+void Read_Gyr(struct BMI088* Sensor){
 	unsigned char data[6];
 	unsigned char length = sizeof(data);
 	unsigned char result = I2C_Read(GYR_ADRS,GYR_DATA,data,length);
@@ -137,12 +137,12 @@ void Read_Gyr(struct BMI088 Sensor){
 		int Gyr_X_B = (data[1]*256) + data[0];
 		int Gyr_Y_B = (data[3]*256) + data[2];
 		int Gyr_Z_B = (data[5]*256) + data[4];
-		Sensor.W_X = (Sensor.W_X*GYR_IIR1) + (((float)Gyr_X_B/32678)*500*GYR_IIR2);
-		Sensor.W_Y = (Sensor.W_Y*GYR_IIR1) + (((float)Gyr_Y_B/32678)*500*GYR_IIR2);
-		Sensor.W_Z = (Sensor.W_Z*GYR_IIR1) + (((float)Gyr_Z_B/32678)*500*GYR_IIR2);
+		Sensor->W_X = (Sensor->W_X*GYR_IIR1) + (((float)Gyr_X_B/32678)*500*GYR_IIR2);
+		Sensor->W_Y = (Sensor->W_Y*GYR_IIR1) + (((float)Gyr_Y_B/32678)*500*GYR_IIR2);
+		Sensor->W_Z = (Sensor->W_Z*GYR_IIR1) + (((float)Gyr_Z_B/32678)*500*GYR_IIR2);
 	}
 }
-char Initialize_BMI088(struct BMI088 Sensor){
+char Initialize_BMI088(struct BMI088* Sensor){
 // returns 9 if successful, lower numbers indicate stage of error     
     // Accelerometer initialization
     unsigned char status = I2C_Transmit(ACC_ADRS,ACC_PWR_CTRL,0x04); // Turn on accelerometer
@@ -167,13 +167,17 @@ char Initialize_BMI088(struct BMI088 Sensor){
     status = I2C_Transmit(GYR_ADRS,INT3_INT4_IO_MAP,0x01); // Map data ready interrupt to INT3 pin
     if (status!=4){return 8;}
     // Calibrate gyroscope
+	struct BMI088 CalSensor = {0};
     volatile unsigned long i = 0;
     while(++i<10000000){
-        Read_Gyr(Sensor);
-    }
-    Sensor.W_X_bias = Sensor.W_X;
-    Sensor.W_Y_bias = Sensor.W_Y;
-    Sensor.W_Z_bias = Sensor.W_Z;
+        if (g_Gyr_Flag==1){
+			g_Gyr_Flag = 0;
+			Read_Gyr(&CalSensor);
+		}
+	}
+    Sensor->W_X_bias = CalSensor.W_X;
+    Sensor->W_Y_bias = CalSensor.W_Y;
+    Sensor->W_Z_bias = CalSensor.W_Z;
 
     return 9;
 }
@@ -188,12 +192,11 @@ void Initialize_ATMEGA328P(){
 }
 /*
 ISR(){
-    g_Acc_Flag ^= 1;
+    g_Acc_Flag == 1;
 }
 
 ISR(){
-    g_Gyr_Flag ^= 1;
+    g_Gyr_Flag == 1;
 }
 */
 #endif
-
