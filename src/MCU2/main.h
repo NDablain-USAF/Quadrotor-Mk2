@@ -3,6 +3,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/twi.h>
 #include "spi.h"
 
 #define SS_ICE_PIN PINB2
@@ -53,6 +54,24 @@ void LoRa_Read(){
 		SPI_Transmit_Long_Data_Visualizer((long)sum,10);
 	}
 
+}
+
+void I2C_Init(){
+	sei();
+	TWAR |= (0x10<<1); // Slave address
+	TWCR |= (1<<TWEA) | (1<<TWEN);
+}
+
+unsigned char I2C_Slave_Read(unsigned char data){
+// returns 2 if successful, lower numbers indicate stage of error
+	if ((TWSR & 0xF8) != 0xA8){return 0;} // SLA+R received
+	TWDR = data;
+	TWCR = (1<<TWINT) | (1<<TWEA);
+	while(!(TWCR & (1<<TWINT))){asm("");}
+	if ((TWSR & 0xF8) != 0xC0){return 1;}
+	TWCR = (1<<TWINT) | (1<<TWEA);
+
+	return 2;
 }
 
 #endif
