@@ -50,3 +50,6 @@ Table of Contents:<br />
    <br />
    <br />
    Code: The decisions to switch from C++ to C is mainly based on the desire to learn more about the C language and perhaps reduce some of the technical baggage that can come with using C++. This means the code will take a functional approach rather than object oriented one. This will mean not using the Arduino.h libraries and instead programming primarily off of the MCU data sheet using direct register manipulation. This will allow for direct control over peripherals such as timers,counters,interrupts, and the analog to digital converter. This will likely increase development time but allow for a depper understanding of the working of the MCU.
+![Screenshot (123)](https://github.com/user-attachments/assets/4d2438ac-33c3-450f-a7b0-e4bc09b90f4f)
+![Screenshot (124)](https://github.com/user-attachments/assets/2bce2013-8938-41ce-964c-524cb2ae7216)
+![Screenshot (125)](https://github.com/user-attachments/assets/2374a117-1842-43d7-8572-21a1cb23d0c2)
