@@ -21,6 +21,8 @@
 #define LORA_TRANSMIT 0b10000011
 #define LORA_REG_IRQ_MASK 0x11
 #define LORA_REG_IRQ_FLAGS 0x12
+#define LORA_REG_PA_CONFIG 0x09
+#define LORA_REG_OCP 0x0B
 
 #define BUTTON_DELAY 60000
 #define START 5000
@@ -42,7 +44,7 @@ struct Potentiometer {
 
 void Detain(unsigned long duration){
 	volatile unsigned long i;
-	while(++i<duration){}
+	while(++i<duration);
 }
 
 void SPI_Transmit_Long_Data_Visualizer(long outbound, unsigned char length, unsigned char option){
@@ -65,12 +67,14 @@ void SPI_Read_Register(char Port, char Pin, char Register, unsigned char* buffer
 	else if (Port==2){PORTC &= ~(1<<Pin);}
 
 	SPDR = Register; // Send register to read from, 0 in 7th bit signifies read command
-	while (!(SPSR & (1<<SPIF))){asm("");} // Wait for flag to be set in status register to continue
+	while (!(SPSR & (1<<SPIF))); // Wait for flag to be set in status register to continue
+	
 	unsigned char i = 0;
-	while(i++<length){
+	while(i<length){
 		SPDR = 1; // Must perform a dummy write even during read
-		while (!(SPSR & (1<<SPIF))){asm("");} // Wait for flag to be set in status register to continue
+		while (!(SPSR & (1<<SPIF))); // Wait for flag to be set in status register to continue
 		*buffer = SPDR;
+		++i;
 		++buffer;
 	}
 	
@@ -85,16 +89,14 @@ unsigned char SPI_Write_Register(char Port, char Pin, char Register, unsigned ch
 	else if (Port==3){PORTD &= ~(1<<Pin);}
 
 	SPDR = (Register|(1<<7)); // Send register to write to, 7th bit must be 1 for write
-	while (!(SPSR & (1<<SPIF))){asm("");} // Wait for flag to be set in status register to continue
+	while (!(SPSR & (1<<SPIF))); // Wait for flag to be set in status register to continue
 	SPDR = Data; // Send new value
-	while (!(SPSR & (1<<SPIF))){asm("");}
+	while (!(SPSR & (1<<SPIF)));
 	unsigned char inbound = SPDR;
-	//if (inbound!=Data){return 0;}
 	
 	if (Port==1){PORTB |= (1<<Pin);}
 	else if (Port==2){PORTC |= (1<<Pin);}
 	else if (Port==3){PORTD |= (1<<Pin);}
-	
 	return inbound;
 }
 
@@ -112,35 +114,34 @@ void ATMega328P_Init(){
 	// Button Setup
 	PCICR |= (1<<2);
 	PCMSK2 |= (1<<3);
-	// Timer 1 Setup
-	TCCR1B |= (1<<WGM12) | (1<<CS12) | (1<<CS10); // /1024 prescaler
 }
 
 void LoRa_Init(){
 	DDRB |= (1<<DDB1);
-	//PORTB |= (1<<PORTB1); // Set SS high
 	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_OP_MODE,0b10000000); // Set to LoRa mode
 	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_F_MSB,0b11100100); // Set frequency to 915 MHz
 	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_F_MIDB,0b11000000);
 	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_F_LSB,0b00000000);
 	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_IRQ_MASK,0b11110111); // Only keep TX done bit unmasked
+	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_OCP,0b00111111);
+	(void)SPI_Write_Register(1,SS_LORA_PIN,0x0C,0b00100011);
+	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_PA_CONFIG,0b11110010); // more..MORE...MORE!!!
 }
 
-void LoRa_Transmit(unsigned char* data, unsigned char length){
+void LoRa_Transmit(unsigned char data[14]){
 	unsigned char i = 0;
 	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_FIFO_ADR_PTR,LORA_REG_TX_BASE);
-	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_PAYLOAD_LENGTH,length);
-	while (i<length){
-		(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_FIFO,*data++);
-		i++;	
+	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_PAYLOAD_LENGTH,14);
+	while (i<14){
+		(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_FIFO,data[i]);
+		++i;
+		//++data;	
 	}
 	(void)SPI_Write_Register(1,SS_LORA_PIN,LORA_REG_OP_MODE,LORA_TRANSMIT);
 	unsigned char status = 0;
 	while (status!=8){
 		(void)SPI_Read_Register(1,SS_LORA_PIN,LORA_REG_IRQ_FLAGS,&status,1);
 	}
-	
-	
 }
 
 void Sample_Pot(struct Potentiometer** Pot){
@@ -168,26 +169,19 @@ void Run_Radio(struct Potentiometer* Pot1,struct Potentiometer* Pot2,struct Pote
 	unsigned char message_stop[14] = {74,117,115,116,32,105,110,32,116,105,109,101,STOP_LB,STOP_MB};
 	static char onetime_start = 0;
 	if (PIND&(1<<PIND5)){
-		if (onetime_start){LoRa_Transmit(message_height,14);}
-		else{LoRa_Transmit(message_start,14);
+		if (onetime_start){LoRa_Transmit(message_height);}
+		else{
+			LoRa_Transmit(message_start);
 			++onetime_start;
 		}
 	}
-	else {LoRa_Transmit(message_stop,14);}
-}
-
-
-ISR (TIMER1_COMPA_vect){
-	PORTD ^= (1<<PORTD5);
-	TIMSK1 &= ~(1<<OCIE1A);
+	else {LoRa_Transmit(message_stop);}
 }
 
 ISR (PCINT2_vect){
-	if (PIND&(1<<PIND3)){
-		TCNT1L = 0;
-		TCNT1H = 0;
-		OCR1A = (unsigned int)BUTTON_DELAY;
-		TIMSK1 |= (1<<OCIE1A);
+	if (!(PIND&(1<<PIND3))){
+		Detain(10000UL);
+		PORTD ^= (1<<PORTD5);
 	}
 }
 #endif
