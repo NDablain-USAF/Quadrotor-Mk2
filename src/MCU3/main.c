@@ -6,11 +6,11 @@ int main(void){
 	struct Potentiometer Pot1 = {POT_MUX1,PORTD6,0};
 	struct Potentiometer Pot2 = {POT_MUX2,PORTD7,0};
 	struct Potentiometer Pot3 = {POT_MUX3,PORTD4,0};
+	Detain(10000UL);
     while(1){
 		Measure_Pot(&Pot1,&Pot2,&Pot3);
 		Run_Radio(&Pot1,&Pot2,&Pot3);
-		
 		Detain(100000UL);
     }
-	return 0;
+		return 0;
 }
