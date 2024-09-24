@@ -1,0 +1,9 @@
+Mechanical:
+  - Use default 3D printer fill pattern, with 15% density
+  - Move fan down slightly to allow more clearance
+  - Make it easier to access motor wires
+  - Redesign cutouts for airflow from fan
+Electrical:
+  - Look into different Microchip MCUs (JTAG, 32bit, ADC, <$5) - PIC32MZ0512EFE064T-I/PT $10
+  - Ensure proper logic level converter for communication interface
+    - Or, given that the PIC32 is 3.3V, switch the BMM350 over to a 3.3V magnetometer and dont include any logic level shifters or additional voltage regulators
